@@ -1,0 +1,88 @@
+{
+  "name": "zeqs-project-dashboard",
+  "displayName": "Zeq's Project Dashboard",
+  "description": "A start page for VS Code that appears when no folder is open: jump back into recent projects, pin favourites, keep a note per project, run package.json scripts, and browse your agent skills.",
+  "version": "0.1.0",
+  "publisher": "ZeqTech",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeqtech/project-dashboard.git"
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "npm run typecheck && npm test && node esbuild.js --production && vsce package --no-dependencies --allow-missing-repository",
+    "publish": "npm run package && vsce publish --no-dependencies --allow-missing-repository"
+  },
+  "keywords": [
+    "projects",
+    "dashboard",
+    "start page",
+    "recent",
+    "workspace",
+    "welcome",
+    "launcher"
+  ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0f766e",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "zeqsProjectDashboard.open",
+        "title": "Open Project Dashboard",
+        "category": "Project Dashboard"
+      }
+    ],
+    "configuration": {
+      "title": "Zeq's Project Dashboard",
+      "properties": {
+        "zeqsProjectDashboard.showOnStartup": {
+          "type": "string",
+          "enum": [
+            "noFolder",
+            "always",
+            "never"
+          ],
+          "enumDescriptions": [
+            "Show the dashboard when VS Code starts with no folder or workspace open and no files open.",
+            "Show the dashboard on every start.",
+            "Never open it automatically. Use the Open Project Dashboard command."
+          ],
+          "default": "noFolder",
+          "description": "When to open the dashboard automatically."
+        },
+        "zeqsProjectDashboard.maxProjects": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 200,
+          "description": "Maximum number of unpinned projects to list."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.3",
+    "vitest": "^2.1.0"
+  }
+}

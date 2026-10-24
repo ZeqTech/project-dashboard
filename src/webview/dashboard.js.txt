@@ -1,0 +1,297 @@
+const vscode = acquireVsCodeApi();
+const $ = (id) => document.getElementById(id);
+const saved = vscode.getState() || {};
+let projects = [];
+let skills = null;
+let tab = saved.tab === "skills" ? "skills" : "projects";
+let view = saved.view === "list" ? "list" : "tiles";
+const collapsed = new Set(Array.isArray(saved.collapsed) ? saved.collapsed : []);
+let groupKeys = [];
+let now = Date.now();
+const openNotes = new Set();
+const timers = new Map();
+
+const saveState = () => vscode.setState({ tab, view, collapsed: [...collapsed] });
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") e.className = v;
+    else if (k === "text") e.textContent = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid) e.append(kid);
+  return e;
+}
+const post = (type, extra) => vscode.postMessage({ type, ...extra });
+const btn = (label, onclick, cls, title) => el("button", { text: label, onclick, class: cls || "", title: title || "", type: "button" });
+
+function ago(ms) {
+  const s = Math.max(0, Math.round((now - ms) / 1000));
+  if (s < 60) return "just now";
+  const units = [[60, "minute"], [3600, "hour"], [86400, "day"], [604800, "week"], [2592000, "month"], [31536000, "year"]];
+  let best = units[0];
+  for (const u of units) if (s >= u[0]) best = u;
+  const n = Math.floor(s / best[0]);
+  return n + " " + best[1] + (n === 1 ? "" : "s") + " ago";
+}
+
+function projectCard(p) {
+  const select = p.scripts.length
+    ? el("select", { "aria-label": "Script to run" }, p.scripts.map((s) => el("option", { value: s, text: s })))
+    : null;
+  const note = el("textarea", {
+    placeholder: "Notes about this project",
+    maxlength: "2000",
+    "aria-label": "Notes for " + p.name,
+    oninput: (e) => {
+      clearTimeout(timers.get(p.path));
+      const text = e.target.value;
+      p.note = text;
+      timers.set(p.path, setTimeout(() => post("note", { path: p.path, text }), 400));
+    },
+  });
+  note.value = p.note;
+  const noteBox = el("div", { class: "note" + (openNotes.has(p.path) || p.note ? "" : " hidden") }, note);
+  const toggleNote = () => {
+    noteBox.classList.toggle("hidden");
+    if (noteBox.classList.contains("hidden")) openNotes.delete(p.path);
+    else {
+      openNotes.add(p.path);
+      note.focus();
+    }
+  };
+
+  return el(
+    "article",
+    { class: "card" + (p.exists ? "" : " missing") },
+    el(
+      "div",
+      { class: "info" },
+      el(
+        "div",
+        { class: "top" },
+        el("span", { class: "name", text: p.name, title: p.name }),
+        el("button", {
+          class: "ghost pin" + (p.pinned ? " on" : ""),
+          text: p.pinned ? "★" : "☆",
+          title: p.pinned ? "Unpin" : "Pin to top",
+          "aria-pressed": String(p.pinned),
+          type: "button",
+          onclick: () => post("pin", { path: p.path, pinned: !p.pinned }),
+        })
+      ),
+      el("div", { class: "path", text: p.path, title: p.path }),
+      el(
+        "div",
+        { class: "badges" },
+        p.kinds.map((k) => el("span", { class: "badge", text: k })),
+        p.branch ? el("span", { class: "badge branch", text: "⎇ " + p.branch }) : null
+      ),
+      el("div", { class: "meta", text: p.exists ? (p.lastOpened ? "Opened " + ago(p.lastOpened) : "Not opened yet") : "Folder not found" })
+    ),
+    el(
+      "div",
+      { class: "acts" },
+      p.exists
+        ? el(
+            "div",
+            { class: "row" },
+            btn("Open", () => post("open", { path: p.path, newWindow: false }), "primary"),
+            btn("New window", () => post("open", { path: p.path, newWindow: true })),
+            btn("Reveal", () => post("reveal", { path: p.path }), "ghost", "Show in file explorer"),
+            btn("Copy path", () => post("copy", { path: p.path }), "ghost"),
+            btn("Note", toggleNote, "ghost", "Add or edit a note")
+          )
+        : null,
+      select
+        ? el("div", { class: "row" }, select, btn("Run " + (p.packageManager || "npm"), () => post("run", { path: p.path, script: select.value }), "", "Run the selected package.json script in a terminal"))
+        : null,
+      el("div", { class: "row" }, btn("Remove", () => post("hide", { path: p.path }), "ghost", "Remove this project from the dashboard"))
+    ),
+    noteBox
+  );
+}
+
+function skillCard(s) {
+  return el(
+    "article",
+    { class: "card skill" },
+    el(
+      "div",
+      { class: "info" },
+      el("div", { class: "top" }, el("span", { class: "name", text: s.name, title: s.name }), el("span", { class: "badge", text: s.agent })),
+      el("div", { class: "desc", text: s.description || "No description.", title: s.description }),
+      el("div", { class: "path", text: s.dir, title: s.dir })
+    ),
+    el(
+      "div",
+      { class: "acts" },
+      el(
+        "div",
+        { class: "row" },
+        btn("Open SKILL.md", () => post("skillOpen", { file: s.file }), "primary"),
+        btn("Reveal", () => post("skillReveal", { file: s.file }), "ghost", "Show in file explorer"),
+        btn("Copy path", () => post("skillCopy", { file: s.file }), "ghost")
+      )
+    )
+  );
+}
+
+/** A collapsible group. While searching, every group is shown open so matches are never hidden. */
+function group(key, title, items, build, searching) {
+  groupKeys.push(key);
+  const open = searching || !collapsed.has(key);
+  const head = el(
+    "button",
+    {
+      class: "group-head",
+      type: "button",
+      "aria-expanded": String(open),
+      onclick: () => {
+        if (collapsed.has(key)) collapsed.delete(key);
+        else collapsed.add(key);
+        saveState();
+        render();
+      },
+    },
+    el("span", { class: "chev", text: open ? "▾" : "▸", "aria-hidden": "true" }),
+    el("span", { text: title }),
+    el("span", { class: "count", text: String(items.length) })
+  );
+  return el("section", { class: "group" }, head, open ? el("div", { class: view === "list" ? "list" : "grid" }, items.map(build)) : null);
+}
+
+function visibleProjects() {
+  const q = $("q").value.trim().toLowerCase();
+  if (!q) return projects;
+  return projects.filter((p) => (p.name + " " + p.path + " " + p.kinds.join(" ") + " " + (p.branch || "") + " " + p.note).toLowerCase().includes(q));
+}
+
+function renderProjects() {
+  const searching = $("q").value.trim() !== "";
+  const list = visibleProjects();
+  const pinned = list.filter((p) => p.pinned);
+  const rest = list.filter((p) => !p.pinned);
+  const root = $("projects");
+  root.replaceChildren();
+  if (pinned.length) root.append(group("projects:pinned", "Pinned", pinned, projectCard, searching));
+  if (rest.length) root.append(group("projects:recent", pinned.length ? "Recent" : "Recent projects", rest, projectCard, searching));
+  if (!list.length) {
+    root.append(
+      el(
+        "div",
+        { class: "empty" },
+        el("div", { text: projects.length ? "No projects match your search." : "No recent projects yet. Open a folder and it will show up here." }),
+        projects.length ? null : btn("Open Folder…", () => post("openFolder"), "primary")
+      )
+    );
+  }
+}
+
+function renderSkills() {
+  const root = $("skills");
+  root.replaceChildren();
+  if (skills === null) {
+    root.append(el("div", { class: "empty", text: "Loading skills…" }));
+    return;
+  }
+  const q = $("q").value.trim().toLowerCase();
+  const list = q ? skills.filter((s) => (s.name + " " + s.description + " " + s.agent + " " + s.scope).toLowerCase().includes(q)) : skills;
+  if (!list.length) {
+    root.append(
+      el("div", { class: "empty", text: skills.length ? "No skills match your search." : "No skills found in ~/.claude/skills, ~/.agents/skills, ~/.codex/skills or in your projects." })
+    );
+    return;
+  }
+  const scopes = [];
+  for (const s of list) {
+    const key = s.scope + "\u0000" + (s.project || "");
+    if (!scopes.includes(key)) scopes.push(key);
+  }
+  for (const key of scopes) {
+    const [scope, project] = key.split("\u0000");
+    const items = list.filter((s) => s.scope === scope && (s.project || "") === project);
+    root.append(group("skills:" + key, scope === "Personal" ? "Personal (home folder)" : scope, items, skillCard, q !== ""));
+  }
+}
+
+function updateToolbar() {
+  for (const v of ["tiles", "list"]) $("view-" + v).setAttribute("aria-pressed", String(v === view));
+  const anyOpen = groupKeys.some((k) => !collapsed.has(k));
+  const toggle = $("toggleAll");
+  toggle.textContent = anyOpen ? "Collapse all" : "Expand all";
+  toggle.classList.toggle("hidden", groupKeys.length === 0);
+}
+
+function render() {
+  groupKeys = [];
+  if (tab === "skills") renderSkills();
+  else renderProjects();
+  updateToolbar();
+}
+
+function setTab(next) {
+  tab = next;
+  saveState();
+  for (const t of ["projects", "skills"]) {
+    $("tab-" + t).setAttribute("aria-selected", String(t === tab));
+    $(t).classList.toggle("hidden", t !== tab);
+  }
+  $("q").placeholder = tab === "projects" ? "Search projects (press / to focus, Enter to open the first match)" : "Search skills (press / to focus)";
+  if (tab === "skills") post("loadSkills");
+  render();
+}
+
+function setView(next) {
+  view = next;
+  saveState();
+  render();
+}
+
+$("q").addEventListener("input", render);
+$("q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && tab === "projects") {
+    const first = visibleProjects().find((p) => p.exists);
+    if (first) post("open", { path: first.path, newWindow: false });
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement === document.body) {
+    e.preventDefault();
+    $("q").focus();
+  }
+});
+$("view-tiles").addEventListener("click", () => setView("tiles"));
+$("view-list").addEventListener("click", () => setView("list"));
+$("toggleAll").addEventListener("click", () => {
+  if (groupKeys.some((k) => !collapsed.has(k))) groupKeys.forEach((k) => collapsed.add(k));
+  else groupKeys.forEach((k) => collapsed.delete(k));
+  saveState();
+  render();
+});
+$("openFolder").addEventListener("click", () => post("openFolder"));
+$("openWorkspace").addEventListener("click", () => post("openWorkspace"));
+$("clone").addEventListener("click", () => post("clone"));
+$("tab-projects").addEventListener("click", () => setTab("projects"));
+$("tab-skills").addEventListener("click", () => setTab("skills"));
+$("tabs").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    setTab(tab === "projects" ? "skills" : "projects");
+    $("tab-" + tab).focus();
+  }
+});
+
+window.addEventListener("message", (e) => {
+  if (e.data.type === "projects") {
+    projects = e.data.projects;
+    now = e.data.now;
+    if (tab === "projects") render();
+  } else if (e.data.type === "skills") {
+    skills = e.data.skills;
+    if (tab === "skills") render();
+  }
+});
+setTab(tab);
+post("ready");

@@ -1,0 +1,75 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.5 var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+.page { max-width: 1040px; margin: 0 auto; padding: 36px 28px 80px; }
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+h1 { font-size: 26px; font-weight: 600; margin: 0; }
+.sub { opacity: .65; margin: 2px 0 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button { white-space: nowrap; font: inherit; cursor: pointer; border-radius: 4px; border: 1px solid transparent; padding: 4px 11px; color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button.primary { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+button.primary:hover { background: var(--vscode-button-hoverBackground); }
+button.ghost { background: transparent; color: var(--vscode-foreground); opacity: .75; padding: 3px 8px; }
+button.ghost:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+input[type=search], select, textarea { font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); border-radius: 4px; }
+input[type=search] { flex: 1; min-width: 0; padding: 7px 10px; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.seg { display: flex; flex: none; }
+.seg button { border-radius: 0; border-color: var(--vscode-widget-border, var(--vscode-panel-border)); }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.seg button[aria-pressed=true] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+.group { margin-top: 18px; }
+.group-head { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; margin-bottom: 8px; padding: 4px 6px; background: transparent; color: var(--vscode-foreground); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.group-head:hover { background: var(--vscode-toolbar-hoverBackground); }
+.group-head .chev { width: 12px; opacity: .7; }
+.group-head .count { opacity: .55; font-weight: 400; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.list .card { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 4px 14px; padding: 8px 12px; }
+.list .info { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.list .info .top { width: 190px; flex: none; }
+.list .info .path { flex: 1; min-width: 0; }
+.list .info .badges { flex: none; min-height: 0; }
+.list .info .meta { flex: none; width: 120px; }
+.list .skill .info .top { width: 230px; }
+.list .skill .info .desc { flex: 1; min-width: 0; -webkit-line-clamp: 1; }
+.list .skill .info .path { display: none; }
+.list .acts { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 4px 6px; justify-content: flex-end; }
+.list .acts .row { margin: 0; flex-wrap: nowrap; }
+.list .row select { flex: none; width: 130px; }
+.list .note { grid-column: 1 / -1; }
+.acts { display: flex; flex-direction: column; gap: 6px; }
+.acts .row { margin-top: 0; }
+@media (max-width: 1180px) {
+  .list .card { grid-template-columns: 1fr; }
+  .list .info { flex-wrap: wrap; gap: 4px 12px; }
+  .list .info .top, .list .skill .info .top { width: auto; }
+  .list .info .path { flex-basis: 100%; }
+  .list .acts { flex-wrap: wrap; justify-content: flex-start; }
+  .list .acts .row { flex-wrap: wrap; }
+}
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); background: var(--vscode-editorWidget-background, transparent); }
+.card:hover { border-color: var(--vscode-focusBorder); }
+.card.missing { opacity: .55; }
+.top { display: flex; align-items: center; gap: 6px; }
+.name { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path { opacity: .6; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.badges { display: flex; flex-wrap: wrap; gap: 5px; min-height: 18px; }
+.badge { font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.badge.branch { background: transparent; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); color: var(--vscode-foreground); }
+.meta { opacity: .55; font-size: 12px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.row select { flex: 1; min-width: 0; padding: 3px 6px; }
+.pin { font-size: 15px; line-height: 1; }
+.pin.on { color: var(--vscode-charts-yellow, #e5c07b); opacity: 1; }
+textarea { width: 100%; min-height: 64px; resize: vertical; padding: 6px 8px; }
+.empty { text-align: center; opacity: .65; padding: 50px 10px; }
+.empty button { margin-top: 12px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); margin-bottom: 14px; }
+.tab { background: transparent; color: var(--vscode-foreground); opacity: .65; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 14px; margin-bottom: -1px; }
+.tab:hover { opacity: 1; background: transparent; }
+.tab[aria-selected=true] { opacity: 1; border-bottom-color: var(--vscode-focusBorder); }
+.desc { font-size: 12px; opacity: .8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hidden { display: none !important; }
