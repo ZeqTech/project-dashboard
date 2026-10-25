@@ -184,6 +184,13 @@ export interface Skill {
   dir: string;
 }
 
+/** Where a skill would land under `root`: the same agent folder and the same skill folder name. */
+export function skillDestination(root: string, skill: Pick<Skill, "agent" | "dir">): string | undefined {
+  const agent = SKILL_DIRS.find((d) => d.agent === skill.agent);
+  if (!agent) return undefined;
+  return [root.replace(/[\\/]+$/, ""), ...agent.dir.split("/"), projectName(skill.dir)].join("/");
+}
+
 const unquote = (v: string) => v.replace(/^(["'])(.*)\1$/, "$2");
 
 /** Name and description from the YAML front matter of a SKILL.md. Handles quoted, folded (>) and literal (|) values. */

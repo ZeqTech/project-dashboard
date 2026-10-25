@@ -72,4 +72,12 @@ textarea { width: 100%; min-height: 64px; resize: vertical; padding: 6px 8px; }
 .tab:hover { opacity: 1; background: transparent; }
 .tab[aria-selected=true] { opacity: 1; border-bottom-color: var(--vscode-focusBorder); }
 .desc { font-size: 12px; opacity: .8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.scope { font-size: 11px; font-weight: 600; padding: 0 8px; border-radius: 9px; border: 1px solid; flex: none; }
+.scope.global { color: var(--vscode-charts-green, #3fb950); border-color: var(--vscode-charts-green, #3fb950); }
+.scope.local { color: var(--vscode-charts-blue, #4aa3ff); border-color: var(--vscode-charts-blue, #4aa3ff); }
+.more { font-size: 16px; line-height: 1; padding: 2px 6px; flex: none; }
+.menu { position: fixed; z-index: 10; min-width: 200px; padding: 4px; display: flex; flex-direction: column; border-radius: 6px; border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, var(--vscode-panel-border))); background: var(--vscode-menu-background, var(--vscode-editorWidget-background)); box-shadow: 0 4px 14px var(--vscode-widget-shadow, rgba(0, 0, 0, .35)); }
+.menu-item { text-align: left; background: transparent; color: var(--vscode-menu-foreground, var(--vscode-foreground)); border-radius: 4px; padding: 5px 10px; }
+.menu-item:hover, .menu-item:focus-visible { background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground)); color: var(--vscode-menu-selectionForeground, var(--vscode-foreground)); }
+.menu-item[aria-disabled=true] { opacity: .45; cursor: default; background: transparent; }
 .hidden { display: none !important; }

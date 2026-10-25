@@ -3,6 +3,8 @@ const $ = (id) => document.getElementById(id);
 const saved = vscode.getState() || {};
 let projects = [];
 let skills = null;
+let folders = [];
+let menu = null;
 let tab = saved.tab === "skills" ? "skills" : "projects";
 let view = saved.view === "list" ? "list" : "tiles";
 const collapsed = new Set(Array.isArray(saved.collapsed) ? saved.collapsed : []);
@@ -114,14 +116,79 @@ function projectCard(p) {
   );
 }
 
+function closeMenu() {
+  if (!menu) return;
+  const { node, opener } = menu;
+  menu = null;
+  node.remove();
+  opener.setAttribute("aria-expanded", "false");
+}
+
+/** The per-skill actions. Local skills can go to the global config; any skill can go to an open project. */
+function skillActions(s) {
+  const isGlobal = !s.project;
+  const here = folders.filter((f) => f.path !== s.project);
+  const intoProject = folders.length === 1 ? "Copy to “" + folders[0].name + "”" : "Copy to open project…";
+  const noProject = !folders.length || (folders.length === 1 && !here.length);
+  return [
+    { label: "Open file location", run: () => post("skillReveal", { file: s.file }) },
+    isGlobal ? null : { label: "Copy to global config", run: () => post("skillToGlobal", { file: s.file, move: false }) },
+    isGlobal ? null : { label: "Move to global config", run: () => post("skillToGlobal", { file: s.file, move: true }) },
+    {
+      label: intoProject,
+      run: () => post("skillToProject", { file: s.file }),
+      disabled: noProject,
+      title: noProject ? (folders.length ? "This skill already lives in the open project" : "Open a folder in the editor to copy into it") : "",
+    },
+  ].filter(Boolean);
+}
+
+function openMenu(opener, s) {
+  const was = menu && menu.opener === opener;
+  closeMenu();
+  if (was) return;
+  const node = el("div", { class: "menu", role: "menu" });
+  for (const a of skillActions(s)) {
+    const item = el("button", { class: "menu-item", role: "menuitem", type: "button", text: a.label, title: a.title || "" });
+    if (a.disabled) item.setAttribute("aria-disabled", "true");
+    else
+      item.addEventListener("click", () => {
+        closeMenu();
+        a.run();
+      });
+    node.append(item);
+  }
+  document.body.append(node);
+  const r = opener.getBoundingClientRect();
+  node.style.top = Math.min(r.bottom + 2, window.innerHeight - node.offsetHeight - 8) + "px";
+  node.style.left = Math.max(8, Math.min(r.right - node.offsetWidth, window.innerWidth - node.offsetWidth - 8)) + "px";
+  opener.setAttribute("aria-expanded", "true");
+  menu = { node, opener };
+  node.querySelector(".menu-item")?.focus();
+}
+
 function skillCard(s) {
+  const more = el("button", { class: "ghost more", text: "⋮", title: "More actions", "aria-label": "More actions for " + s.name, "aria-haspopup": "menu", "aria-expanded": "false", type: "button" });
+  more.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openMenu(more, s);
+  });
   return el(
     "article",
     { class: "card skill" },
     el(
       "div",
       { class: "info" },
-      el("div", { class: "top" }, el("span", { class: "name", text: s.name, title: s.name }), el("span", { class: "badge", text: s.agent })),
+      el(
+        "div",
+        { class: "top" },
+        el("span", { class: "name", text: s.name, title: s.name }),
+        s.project
+          ? el("span", { class: "scope local", text: "Local", title: "Only available in " + s.scope })
+          : el("span", { class: "scope global", text: "Global", title: "Available in every project (your home-folder config)" }),
+        el("span", { class: "badge", text: s.agent }),
+        more
+      ),
       el("div", { class: "desc", text: s.description || "No description.", title: s.description }),
       el("div", { class: "path", text: s.dir, title: s.dir })
     ),
@@ -132,7 +199,6 @@ function skillCard(s) {
         "div",
         { class: "row" },
         btn("Open SKILL.md", () => post("skillOpen", { file: s.file }), "primary"),
-        btn("Reveal", () => post("skillReveal", { file: s.file }), "ghost", "Show in file explorer"),
         btn("Copy path", () => post("skillCopy", { file: s.file }), "ghost")
       )
     )
@@ -213,7 +279,7 @@ function renderSkills() {
   for (const key of scopes) {
     const [scope, project] = key.split("\u0000");
     const items = list.filter((s) => s.scope === scope && (s.project || "") === project);
-    root.append(group("skills:" + key, scope === "Personal" ? "Personal (home folder)" : scope, items, skillCard, q !== ""));
+    root.append(group("skills:" + key, scope === "Personal" ? "Global (home folder)" : scope + " · local", items, skillCard, q !== ""));
   }
 }
 
@@ -226,6 +292,7 @@ function updateToolbar() {
 }
 
 function render() {
+  closeMenu();
   groupKeys = [];
   if (tab === "skills") renderSkills();
   else renderProjects();
@@ -283,6 +350,25 @@ $("tabs").addEventListener("keydown", (e) => {
   }
 });
 
+document.addEventListener("click", (e) => {
+  if (menu && !menu.node.contains(e.target)) closeMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (!menu) return;
+  const items = [...menu.node.querySelectorAll(".menu-item")];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === "Escape") {
+    const { opener } = menu;
+    closeMenu();
+    opener.focus();
+  } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+  }
+});
+window.addEventListener("resize", closeMenu);
+window.addEventListener("scroll", closeMenu, true);
+
 window.addEventListener("message", (e) => {
   if (e.data.type === "projects") {
     projects = e.data.projects;
@@ -290,6 +376,7 @@ window.addEventListener("message", (e) => {
     if (tab === "projects") render();
   } else if (e.data.type === "skills") {
     skills = e.data.skills;
+    folders = e.data.folders || [];
     if (tab === "skills") render();
   }
 });

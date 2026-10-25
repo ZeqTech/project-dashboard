@@ -13,6 +13,7 @@ import {
   pathKey,
   projectName,
   relativeTime,
+  skillDestination,
 } from "./model";
 
 describe("pathKey / projectName", () => {
@@ -131,5 +132,16 @@ describe("relativeTime / clampNote", () => {
   });
   it("limits notes", () => {
     expect(clampNote("x".repeat(NOTE_LIMIT + 50)).length).toBe(NOTE_LIMIT);
+  });
+});
+
+describe("skillDestination", () => {
+  it("keeps the agent folder and skill folder name under the new root", () => {
+    const skill = { agent: "Claude", dir: "C:\\work\\app\\.claude\\skills\\my-skill" };
+    expect(skillDestination("C:\\Users\\me\\", skill)).toBe("C:\\Users\\me/.claude/skills/my-skill");
+    expect(skillDestination("/home/me", { agent: "Codex", dir: "/p/.codex/skills/x" })).toBe("/home/me/.codex/skills/x");
+  });
+  it("returns nothing for an unknown agent", () => {
+    expect(skillDestination("/r", { agent: "Other", dir: "/p/s" })).toBeUndefined();
   });
 });

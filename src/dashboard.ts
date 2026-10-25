@@ -1,8 +1,11 @@
 import * as crypto from "crypto";
+import * as fs from "fs/promises";
+import * as os from "os";
+import * as path from "path";
 import * as vscode from "vscode";
 import css from "./webview/dashboard.css.txt";
 import script from "./webview/dashboard.js.txt";
-import { clampNote, isSafeScriptName, mergeProjects, pathKey, projectName, ProjectInfo } from "./model";
+import { clampNote, isSafeScriptName, mergeProjects, pathKey, projectName, ProjectInfo, Skill, skillDestination } from "./model";
 import { vscodeRecent } from "./recent";
 import { scanProject } from "./scan";
 import { scanSkills } from "./skills";
@@ -48,8 +51,8 @@ export class Dashboard {
   private panel?: vscode.WebviewPanel;
   /** Paths the webview may act on: only what was last listed to it. */
   private known = new Map<string, string>();
-  /** SKILL.md files the webview may open, keyed like `known`. */
-  private knownSkills = new Map<string, string>();
+  /** Skills the webview may act on, keyed by SKILL.md path like `known`. */
+  private knownSkills = new Map<string, Skill>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -88,13 +91,48 @@ export class Dashboard {
     if (!this.panel) return;
     if (!this.known.size) await this.refresh();
     const skills = await scanSkills([...this.known.values()]);
-    this.knownSkills = new Map(skills.map((s) => [pathKey(s.file), s.file]));
-    void this.panel?.webview.postMessage({ type: "skills", skills });
+    this.knownSkills = new Map(skills.map((s) => [pathKey(s.file), s]));
+    const folders = this.openFolders().map((f) => ({ name: projectName(f), path: f }));
+    void this.panel?.webview.postMessage({ type: "skills", skills, folders });
   }
 
-  private async onSkillMessage(m: { type?: string; file?: unknown }): Promise<void> {
-    const file = typeof m.file === "string" ? this.knownSkills.get(pathKey(m.file)) : undefined;
-    if (!file) return;
+  /** Local folders open in the editor right now. */
+  private openFolders(): string[] {
+    return (vscode.workspace.workspaceFolders ?? []).filter((f) => f.uri.scheme === "file").map((f) => f.uri.fsPath);
+  }
+
+  /** Copy (or move) a skill folder under `root`, asking before it replaces one that is already there. */
+  private async transferSkill(skill: Skill, root: string, label: string, move: boolean): Promise<void> {
+    const dest = skillDestination(root, skill);
+    if (!dest) return;
+    if (pathKey(dest) === pathKey(skill.dir)) {
+      void vscode.window.showInformationMessage(`"${skill.name}" is already in ${label}.`);
+      return;
+    }
+    const exists = await fs.stat(dest).then(() => true, () => false);
+    const verb = move ? "Move" : "Copy";
+    const detail = `${skill.dir}
+→ ${dest}`;
+    if (exists || move) {
+      const action = exists ? "Replace" : verb;
+      const text = exists ? `"${skill.name}" already exists in ${label}. Replace it?` : `Move "${skill.name}" to ${label}?`;
+      const answer = await vscode.window.showWarningMessage(text, { modal: true, detail }, action);
+      if (answer !== action) return;
+    }
+    if (exists) await fs.rm(dest, { recursive: true, force: true });
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    // dereference: skill folders are often symlinks, and the copy should be real files.
+    await fs.cp(skill.dir, dest, { recursive: true, dereference: true });
+    // rm on a symlinked skill folder removes the link, never the files it points to.
+    if (move) await fs.rm(skill.dir, { recursive: true, force: true });
+    void vscode.window.setStatusBarMessage(`${verb === "Move" ? "Moved" : "Copied"} "${skill.name}" to ${label}`, 3000);
+    await this.loadSkills();
+  }
+
+  private async onSkillMessage(m: { type?: string; file?: unknown; move?: unknown }): Promise<void> {
+    const skill = typeof m.file === "string" ? this.knownSkills.get(pathKey(m.file)) : undefined;
+    if (!skill) return;
+    const file = skill.file;
     const uri = vscode.Uri.file(file);
     switch (m.type) {
       case "skillOpen":
@@ -107,6 +145,22 @@ export class Dashboard {
         await vscode.env.clipboard.writeText(file);
         void vscode.window.setStatusBarMessage("Path copied", 2000);
         break;
+      case "skillToGlobal":
+        await this.transferSkill(skill, os.homedir(), "your global config", m.move === true);
+        break;
+      case "skillToProject": {
+        const folders = this.openFolders();
+        if (!folders.length) {
+          void vscode.window.showInformationMessage("Open a folder in the editor to copy skills into it.");
+          break;
+        }
+        const root =
+          folders.length === 1
+            ? folders[0]
+            : (await vscode.window.showQuickPick(folders.map((f) => ({ label: projectName(f), description: f })), { placeHolder: "Copy the skill into which project?" }))?.description;
+        if (root) await this.transferSkill(skill, root, `"${projectName(root)}"`, false);
+        break;
+      }
     }
   }
 
@@ -131,6 +185,8 @@ export class Dashboard {
         case "skillOpen":
         case "skillReveal":
         case "skillCopy":
+        case "skillToGlobal":
+        case "skillToProject":
           return await this.onSkillMessage(m);
       }
 
