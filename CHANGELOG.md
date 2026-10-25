@@ -2,6 +2,11 @@
 
 Generated from commit history by `scripts/changelog.js`.
 
+## [0.3.0] - 2026-10-25
+
+### Added
+- Local / global configs (f5c120b)
+
 ## [0.2.0] - 2026-10-24
 
 ### Changed

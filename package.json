@@ -2,7 +2,7 @@
   "name": "zeqs-project-dashboard",
   "displayName": "Zeq's Project Dashboard",
   "description": "A start page for VS Code that appears when no folder is open: jump back into recent projects, pin favourites, keep a note per project, run package.json scripts, and browse your agent skills.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "ZeqTech",
   "license": "MIT",
   "repository": {
