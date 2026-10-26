@@ -46,7 +46,8 @@
       {
         "command": "zeqsProjectDashboard.open",
         "title": "Open Project Dashboard",
-        "category": "Project Dashboard"
+        "category": "Project Dashboard",
+        "icon": "$(dashboard)"
       }
     ],
     "configuration": {
@@ -75,6 +76,14 @@
           "description": "Maximum number of unpinned projects to list."
         }
       }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "zeqsProjectDashboard.open",
+          "group": "navigation@1"
+        }
+      ]
     }
   },
   "devDependencies": {

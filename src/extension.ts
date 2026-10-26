@@ -12,6 +12,13 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  item.text = "$(dashboard)";
+  item.tooltip = "Open Project Dashboard";
+  item.command = "zeqsProjectDashboard.open";
+  item.show();
+  context.subscriptions.push(item);
+
   // Remember what is open now so it ranks first next time, even if VS Code's own list is unavailable.
   const file = vscode.workspace.workspaceFile;
   if (file?.scheme === "file") void store.touch(file.fsPath);
