@@ -2,6 +2,11 @@
 
 Generated from commit history by `scripts/changelog.js`.
 
+## [0.3.1] - 2026-10-26
+
+### Added
+- Status bar icon (e7350c1)
+
 ## [0.3.0] - 2026-10-25
 
 ### Added
